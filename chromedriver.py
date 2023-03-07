@@ -5,11 +5,6 @@ from selenium.webdriver.support.ui import Select
 
 URL = "https://publico.agcp.ipleiria.pt/paginas/ScheduleRptCursosSemanalPublico.aspx"
 
-CAMPUS_DROPDOWN = "ctl00$PlaceHolderAGCPUO$ddlUO"
-COURSE_DROPDOWN = "ctl00$PlaceHolderMain$ddlCursos"
-YEAR_DROPDOWN = "ctl00$PlaceHolderMain$ddlAnosCurr"
-WEEK_DROPDOWN = "ctl00$PlaceHolderMain$ddlSemanas"
-
 
 class selenium:
     def __init__(self):
@@ -30,13 +25,13 @@ class selenium:
         select.select_by_value(value)
 
     def select_campus(self, value):
-        self.select(CAMPUS_DROPDOWN, value)
+        self.select("ctl00$PlaceHolderAGCPUO$ddlUO", value)
 
     def select_course(self, value):
-        self.select(COURSE_DROPDOWN, value)
+        self.select("ctl00$PlaceHolderMain$ddlCursos", value)
 
     def select_year(self, value):
-        self.select(YEAR_DROPDOWN, value)
+        self.select("ctl00$PlaceHolderMain$ddlAnosCurr", value)
 
     def select_week(self, value):
-        self.select(WEEK_DROPDOWN, value)
+        self.select("ctl00$PlaceHolderMain$ddlSemanas", value)

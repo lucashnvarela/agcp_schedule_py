@@ -16,18 +16,28 @@ class sql:
             'end_date TEXT NULL)')
 
         self.cursor.execute(
+            'CREATE TABLE IF NOT EXISTS weekday_week (' +
+            'id INTEGER PRIMARY KEY AUTOINCREMENT, ' +
+            'weekday_id INTEGER NOT NULL, ' +
+            'week_id INTEGER NOT NULL, ' +
+
+            'FOREIGN KEY(weekday_id) REFERENCES weekday(id), ' +
+            'FOREIGN KEY(week_id) REFERENCES week(id))')
+
+        self.cursor.execute(
             'CREATE TABLE IF NOT EXISTS weekday (' +
             'id INTEGER PRIMARY KEY AUTOINCREMENT, ' +
-            'week_id INTEGER NOT NULL, ' +
-            'name TEXT NOT NULL, ' +
-            'day TEXT NULL, '
+            'name TEXT NOT NULL)')
 
-            'FOREIGN KEY(week_id) REFERENCES week(id))')
+        self.cursor.executemany(
+            'INSERT INTO weekday (name) ' +
+            'VALUES (?)',
+            [(weekday_name,) for weekday_name in WEEKDAYS])
 
         self.cursor.execute(
             'CREATE TABLE IF NOT EXISTS klass (' +
             'id INTEGER PRIMARY KEY AUTOINCREMENT, ' +
-            'weekday_id INTEGER NOT NULL, ' +
+            'weekdayweek_id INTEGER NOT NULL, ' +
             'name TEXT NOT NULL, ' +
             'type TEXT NOT NULL, ' +
             'teacher TEXT NOT NULL, ' +
@@ -35,7 +45,7 @@ class sql:
             'start_time TEXT NOT NULL, ' +
             'end_time TEXT NOT NULL, ' +
 
-            'FOREIGN KEY(weekday_id) REFERENCES weekday(id))')
+            'FOREIGN KEY(weekdayweek_id) REFERENCES weekday_week(id))')
 
         self.connect.commit()
 
@@ -47,25 +57,19 @@ class sql:
 
         week_id = self.cursor.lastrowid
 
-        for weekday in WEEKDAYS:
-            self.insert_weekday(week_id, weekday, None)
+        self.cursor.executemany(
+            'INSERT INTO weekday_week (weekday_id, week_id) ' +
+            'VALUES (?, ?)',
+            [(weekday_id, week_id) for weekday_id in range(1, len(WEEKDAYS))])
 
         self.connect.commit()
         return week_id
 
-    def insert_weekday(self, week_id, name, day):
+    def insert_klass(self, weekdayweek_id, name, type, teacher, room, start_time, end_time):
         self.cursor.execute(
-            'INSERT INTO weekday (week_id, name, day) ' +
-            'VALUES (?, ?, ?)',
-            (week_id, name, day))
-
-        self.connect.commit()
-
-    def insert_klass(self, weekday_id, name, type, teacher, room, start_time, end_time):
-        self.cursor.execute(
-            'INSERT INTO klass (weekday_id, name, type, teacher, room, start_time, end_time) ' +
+            'INSERT INTO klass (weekdayweek_id, name, type, teacher, room, start_time, end_time) ' +
             'VALUES (?, ?, ?, ?, ?, ?, ?)',
-            (weekday_id, name, type, teacher, room, start_time, end_time))
+            (weekdayweek_id, name, type, teacher, room, start_time, end_time))
 
         self.connect.commit()
 
@@ -74,32 +78,12 @@ class sql:
 
         return self.cursor.fetchall()
 
-    def get_weekdays(self, week_id):
+    def get_weekdayweek(self, week_id, weekday_id):
         self.cursor.execute(
-            'SELECT * FROM weekday ' +
-            'WHERE week_id = ?',
-            (week_id,))
+            'SELECT * FROM weekday_week ' +
+            'WHERE week_id = ? AND weekday_id = ?',
+            (week_id, weekday_id))
 
-        return self.cursor.fetchall()
+        weekdayweek_id = self.cursor.fetchone()[0]
 
-    def get_klasses(self, weekday_id):
-        self.cursor.execute(
-            'SELECT * FROM klass ' +
-            'WHERE weekday_id = ?',
-            (weekday_id,))
-
-        return self.cursor.fetchall()
-
-    def show_database(self):
-        for week in self.get_weeks():
-            print("week: ", week)
-
-            for weekday in self.get_weekdays(week[0]):
-                print("weekday: ", weekday)
-
-                for klass in self.get_klasses(weekday[0]):
-                    print("klass: ", klass)
-
-                print()
-
-            print()
+        return weekdayweek_id

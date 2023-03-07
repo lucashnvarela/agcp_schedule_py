@@ -1,65 +1,62 @@
 import re
 from bs4 import BeautifulSoup as bs
-from webdriver import selenium
+from chromedriver import selenium
+from database import *
 
 
-class Weekday:
-    def __init__(self, name):
-        self.name = name
-        self.classes = []
+def auto_select():
+    driver = selenium()
 
-    def show(self):
-        print(self.name)
-        for klass in self.classes:
-            klass.show()
+    driver.select_campus("2")
+    driver.select_course("4515")
+    driver.select_year("1")
+    driver.select_week("19-09-2022")
 
-
-class Klass:
-    def __init__(self, string):
-        self.name, self.type = re.search("(.+?)\s*\((.+?)\)", string).groups()
-        self.teacher = re.search("-\s*(.+?)\s*-", string).group(1)
-        self.room = re.search("-\s*(.+?)\s*-\s*(.+?)\s*-", string).group(2)
-        self.start_time, self.end_time = re.search(
-            "-\s*(\d{2}:\d{2})", string).groups()
-
-    def show(self):
-        print(self.name, self.type, self.teacher,
-              self.room, self.start_time, self.end_time)
+    return bs(driver.source(), "html.parser")
 
 
-URL = "https://publico.agcp.ipleiria.pt/paginas/ScheduleRptCursosSemanalPublico.aspx"
+def scrape_schedule():
+    schedule = {}
 
-CAMPUS_DROPDOWN = "ctl00$PlaceHolderAGCPUO$ddlUO"
-COURSE_DROPDOWN = "ctl00$PlaceHolderMain$ddlCursos"
-YEAR_DROPDOWN = "ctl00$PlaceHolderMain$ddlAnosCurr"
-WEEK_DROPDOWN = "ctl00$PlaceHolderMain$ddlSemanas"
+    html = auto_select()
+    tr_id = {"id": "PlaceHolderMain_DayPilotCalendar1_events"}
+    td_list = html.find("tr", tr_id).find_all("td")
 
-TABLE_EVENTS = "PlaceHolderMain_DayPilotCalendar1_events"
+    for td,	weekday_id in zip(td_list, range(1, len(WEEKDAYS))):
+        schedule[weekday_id] = []
 
-selenium = selenium()
-selenium.get(URL)
+        if td.findChild().findChild() is not None:
+            for div in td.findChild().find_all("div", recursive=False):
+                div_title = div.find(
+                    "div", {"title": True}, recursive=False)
+                div_text = div_title.find(
+                    "div", string=True, recursive=False).text
 
-selenium.select(CAMPUS_DROPDOWN, "2")
-selenium.select(COURSE_DROPDOWN, "4515")
-selenium.select(YEAR_DROPDOWN, "1")
+                name, type = re.search(r"(.+?)\s*\((.+?)\)", div_text).groups()
+                teacher = re.search(r"-\s*(.+?)\s*-", div_text).group(1)
+                if re.search(r"\.", teacher) is None:
+                    teacher = "-"
+                room = div_text.split(" - ")[-1]
+                start_time, end_time = div_title["title"].split(" - ")[-2:]
 
-html = selenium.source()
-soup = bs(html, "html.parser")
+                schedule[weekday_id].append((
+                    name, type, teacher, room, start_time, end_time))
 
-weekdays = ["Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"]
-week = [Weekday(name) for name in weekdays]
-
-for td, weekday in zip(soup.find("tr", {"id": TABLE_EVENTS}).find_all("td"), weekdays):
-    if td.findChild().findChild() is not None:
-        for div in td.findChild().find_all("div", recursive=False):
-            div_title = div.find(
-                "div", {"title": True}, recursive=False)
-            div_text = div_title.find(
-                "div", string=True, recursive=False).text
-
-            #klass = Klass(s)
-            # week[weekdays.index(weekday)].classes.append(klass)
+    return schedule
 
 
-for weekday in week:
-    weekday.show()
+def main():
+    schedule = scrape_schedule()
+
+    database = sql()
+    week_id = database.insert_week()
+
+    for weekday_id in range(1, len(WEEKDAYS)):
+        weekdayweek_id = database.get_weekdayweek(week_id, weekday_id)
+        for klass in schedule[weekday_id]:
+            database.insert_klass(weekdayweek_id, *klass)
+
+    database.connect.close()
+
+
+main()
